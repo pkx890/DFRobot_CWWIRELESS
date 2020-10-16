@@ -23,7 +23,7 @@ String str="";
 
 void recvCallback();
 void recvCallback(){ 
-  if((millis()-rtime)>500){
+  if((millis()-rtime)>PACKET_INTERVAL){
     if(CWWIRELESS.cumsgBufHead!=NULL){
       CWWIRELESS.hostBegintransfer();
     }
@@ -44,7 +44,7 @@ void setup()
 
 void loop()
 { 
-  if((millis()-stime)>5000)
+  if((millis()-stime)>10000)
   {
     CWWIRELESS.transferHoststring("This is a message from the HOST\n");
     stime=millis();

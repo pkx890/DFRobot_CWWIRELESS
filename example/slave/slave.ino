@@ -23,7 +23,7 @@ String str="";
 
 void recvCallback();
 void recvCallback(){
-  if((millis()-rtime)>500){
+  if((millis()-rtime)>PACKET_INTERVAL){
     String str=CWWIRELESS.receiveHoststring();
     if(str!=""){
       Serial.print(str.c_str());
@@ -44,7 +44,7 @@ void setup()
 
 void loop()
 {
-  if((millis()-stime)>5000)
+  if((millis()-stime)>10000)
   {
     CWWIRELESS.transferSlavestring("This is a message from the SLAVE\n");
     stime=millis();

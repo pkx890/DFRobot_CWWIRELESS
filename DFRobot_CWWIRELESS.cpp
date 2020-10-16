@@ -36,7 +36,7 @@ uint8_t CWWIRELESS::slaveStatus(){
   }
 }
 
-void CWWIRELESS::getSlavePPPPdata(uint8_t* buf,uint8_t size){
+bool CWWIRELESS::getSlavePPPPdata(uint8_t* buf,uint8_t size){
   uint8_t data_flow;
   uint8_t i = 0;
   String str="";
@@ -80,15 +80,18 @@ void CWWIRELESS::setSlavePPPPdata(uint8_t* buf,uint8_t size){
 void CWWIRELESS::transferSlavestring(char* str){
   uint8_t buf[4];
   uint8_t len=strlen(str);
-  uint8_t packcount=len/4;
-  uint8_t num=len%4;
+  uint8_t packcount=len/VALID_DATA;
+  uint8_t num=len%VALID_DATA;
 
   for(int i=0;i<packcount;i++){
-    for(int j=0;j<4;j++){
+    for(int j=0;j<VALID_DATA;j++){
       buf[j]=(int)(*str);
       str++;
     }
-    cuappEnqueue(buf);
+    buf[SLAVE_CHEAK_DATA]=proof_test_value++;
+    if(0==cuappEnqueue(buf)){
+		proof_test_value--;
+	}
   }
   for(int i =0;i<4;i++){
     buf[i]=0;
@@ -97,16 +100,20 @@ void CWWIRELESS::transferSlavestring(char* str){
     buf[i]=(int)(*str);
     str++;
   }
-  cuappEnqueue(buf);
+  buf[SLAVE_CHEAK_DATA]=proof_test_value++;
+    if(0==cuappEnqueue(buf)){
+      proof_test_value--;
+    }
 }
 
 void CWWIRELESS::slaveBegintransfer(){
-  struct sQueueData *buf=cuappDequeue();
-  if(buf!=NULL){
-    setSlavePPPPdata(buf->data,4);
-    free(buf);
-    buf=NULL;
+  denominator++;
+  if(Ready_to_send_packets==NULL){
+    molecule++;
+    Ready_to_send_packets = cuappDequeue();
   }
+  setSlavePPPPdata(Ready_to_send_packets->data,4);
+  MARK=Ready_to_send_packets->data[3];
 }
 
 uint8_t CWWIRELESS::chackSlavestate(){
@@ -120,10 +127,19 @@ String CWWIRELESS::receiveHoststring(){
   String str;
   if(chackSlavestate()){
     getSlavePPPPdata(buf,4);
-    for(int i=0;i<4;i++)
+    if(buf[3]==MARK){
+      free(Ready_to_send_packets);
+      Ready_to_send_packets=NULL;
+    }
+    for(int i=0;i<3;i++)
     {
       str+=(char)buf[i];
-    } 
+    }
+    if(buf[3]!=data1){
+      data1=buf[3];
+    }else{
+      str="";
+    }
     return str;
   }
 }
@@ -159,16 +175,19 @@ void CWWIRELESS::sendHostpacket(uint8_t* buf,uint8_t size){
 void CWWIRELESS::transferHoststring(char* str){
   uint8_t buf[6]={0x48,0};
   uint8_t len=strlen(str);
-  uint8_t packcount=len/4;
-  uint8_t num=len%4;
-
+  uint8_t packcount=len/VALID_DATA;
+  uint8_t num=len%VALID_DATA;
+  
   for(int i=0;i<packcount;i++){
-    for(int j=1;j<5;j++)
+    for(int j=1;j<VALID_DATA+1;j++)
     {
       buf[j]=(int)(*str);
       str++;
     }
-    cuappEnqueue(buf);
+    buf[HOST_CHEAK_DATA]=proof_test_value++;
+          if(0==cuappEnqueue(buf)){
+		proof_test_value--;
+	}
   }
   
   for(int i =1;i<6;i++){
@@ -179,17 +198,20 @@ void CWWIRELESS::transferHoststring(char* str){
     buf[i]=(int)(*str);
     str++;
   }
-
-  cuappEnqueue(buf);
+  buf[HOST_CHEAK_DATA]=proof_test_value++;
+  if(0==cuappEnqueue(buf)){
+    proof_test_value--;
+  }
 }
 
 void CWWIRELESS::hostBegintransfer(){
-  struct sQueueData *buf=cuappDequeue();
-  if(buf!=NULL){
-    sendHostpacket(buf->data,5);
-    free(buf);
-    buf=NULL;
+  denominator++;
+  if(Ready_to_send_packets==NULL){
+    molecule++;
+    Ready_to_send_packets=cuappDequeue();
   }
+  sendHostpacket(Ready_to_send_packets->data,5);
+  MARK=Ready_to_send_packets->data[4];
 }
 
 void CWWIRELESS::setCallback(void (*call)()){
@@ -245,15 +267,24 @@ uint8_t CWWIRELESS::receiveHostpacket(uint8_t* buf){
 
 String CWWIRELESS::reciveSlavestring(){
   uint8_t rbuf[6]={0};
-  uint8_t tbuf[5]={0x48,0};
+  int i=0;
   String newstr;
   if(getHostflag()){
     uint8_t rsize=receiveHostpacket(rbuf);
     if(rsize+1 >= 1 ){
-      for(int i = 1;i < rsize+1;i++){
-        if(rbuf[i+1]!=0)
-        newstr+=(char)rbuf[i+1];
+      for(i = 2;i < rsize+1;i++){
+        newstr+=(char)rbuf[i];
       }
+    uint8_t d=MARK-1;
+    if((rbuf[5]==MARK)|| (rbuf[5]==d)){
+      free(Ready_to_send_packets);
+      Ready_to_send_packets=NULL;
+    }
+    if(rbuf[5]!=data1)
+      data1=rbuf[5];
+    else{
+      newstr="";
+    }
       return newstr;
     }
   }else{
@@ -271,12 +302,13 @@ uint8_t CWWIRELESS::getCoupling(){
 }
 
 //queue
-void CWWIRELESS::cuappEnqueue(uint8_t* pbuf){
+bool CWWIRELESS::cuappEnqueue(uint8_t* pbuf){
   struct sQueueData *p;
   p = (struct sQueueData*)malloc(sizeof(struct sQueueData));
   if(p == NULL){
     free(p);
-    return;
+    p=NULL;
+    return 0;
   }
   p->next = NULL;
   if(cumsgBufHead==NULL){
@@ -288,6 +320,7 @@ void CWWIRELESS::cuappEnqueue(uint8_t* pbuf){
   }
   memset(p->data,0x00,5);
   memcpy(p->data,pbuf,5);
+  return 1;
 }
 
 struct sQueueData* CWWIRELESS::cuappDequeue(void){
@@ -313,7 +346,7 @@ void CWWIRELESS_IIC::readReg(uint8_t reg,uint8_t* buf,uint8_t len){
   Wire.write(reg);
   if(this->type)
     Wire.write(0);
-  Wire.endTransmission();  
+  uint8_t data=Wire.endTransmission();  
   Wire.requestFrom(IIC_addr,len);
   for(int i=0;i<len;i++){
     buf[i]=Wire.read();

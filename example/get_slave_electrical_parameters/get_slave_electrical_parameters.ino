@@ -41,7 +41,8 @@ void setup()
   Serial.print("Temp:\t");
   Serial.println(sSlavemessage.Temp);
   Serial.print("Fre:\t");
-  Serial.println(sSlavemessage.Fre);
+  Serial.print(sSlavemessage.Fre);
+  Serial.println("\tHZ");
   Serial.print("Duty:\t");
   Serial.println(sSlavemessage.Duty);
   Serial.print("NTC:\t");

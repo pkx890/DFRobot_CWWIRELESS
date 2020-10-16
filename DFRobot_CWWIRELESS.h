@@ -55,6 +55,11 @@
 #define SYS_CMD_OCP_CHANGE       0x20
 #define SYS_CMD_VOUT_CHANGE      0x40
 
+#define VALID_DATA               3
+#define SLAVE_CHEAK_DATA         3
+#define HOST_CHEAK_DATA          4
+
+
 #define DBG(sth)   Serial.print("DBG:");Serial.print(__LINE__);Serial.print("        ");Serial.println(sth)
 
 typedef struct
@@ -78,6 +83,12 @@ struct sQueueData{
 class CWWIRELESS
 {
   public:
+    uint8_t proof_test_value=1;
+    uint8_t MARK=0;
+    uint8_t data1=255;
+    int molecule=0;
+    int denominator=0;
+    struct sQueueData * Ready_to_send_packets;
     //TX
     uint8_t type;
     CWWIRELESS(){};
@@ -87,7 +98,7 @@ class CWWIRELESS
     void transferSlavestring(char* str);
     uint8_t slaveStatus();
     String receiveHoststring();
-    void getSlavePPPPdata(uint8_t* buf,uint8_t size);
+    bool getSlavePPPPdata(uint8_t* buf,uint8_t size);
     void setSlavePPPPdata(uint8_t* buf,uint8_t size);
     uint8_t chackSlavestate();
     void slaveBegintransfer();
@@ -101,6 +112,7 @@ class CWWIRELESS
     uint8_t getHostflag();
     void clearIntrflag(uint8_t flag);
     uint8_t receiveHostpacket(uint8_t* buf);
+    //String reciveSlavestring(uint16_t str);
     void setItp();
     String reciveSlavestring();
     void hostBegintransfer();
@@ -109,7 +121,7 @@ class CWWIRELESS
     void (*callback)();
     struct sQueueData *cumsgBufHead=NULL;
     struct sQueueData *cumsgBufTail=NULL;
-    void cuappEnqueue(uint8_t *pbuf);
+    bool cuappEnqueue(uint8_t *pbuf);
     struct sQueueData* cuappDequeue();
     void setCallback(void (*call)());
     void loop();

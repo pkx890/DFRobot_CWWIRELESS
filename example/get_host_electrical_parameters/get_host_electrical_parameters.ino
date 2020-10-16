@@ -29,11 +29,13 @@ void setup()
   Serial.print("showhostChipID:\t0x");
   Serial.println(CWWIRELESS.hostChipID(),HEX);
 
-  Serial.print("showhostVout:\t0x");
-  Serial.println(CWWIRELESS.hostVout(),HEX);
+  Serial.print("showhostVout:\t");
+  Serial.print(CWWIRELESS.hostVout());
+  Serial.println("\tmV");
 
-  Serial.print("showhostFreq:\t0x");
-  Serial.println(CWWIRELESS.hostFreq(),HEX);
+  Serial.print("showhostFreq:");
+  Serial.print(CWWIRELESS.hostFreq());
+  Serial.println("\tHZ");
 
 }
 

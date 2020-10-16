@@ -20,6 +20,7 @@ static long long rtime=0;
 
 CWWIRELESS_IIC CWWIRELESS(0x24,SLAVE);
 String str="";
+
 void recvCallback();
 void recvCallback(){
   if((millis()-rtime)>500){
@@ -39,14 +40,13 @@ void setup()
 {
   Serial.begin(115200);
   CWWIRELESS.setCallback(recvCallback);
-  CWWIRELESS.transferSlavestring("slave begin\r\n");
 }
 
 void loop()
 {
   if((millis()-stime)>5000)
   {
-    CWWIRELESS.transferSlavestring("hello world nihao aaa bbb 123 !@$#\r\n");
+    CWWIRELESS.transferSlavestring("This is a message from the SLAVE\n");
     stime=millis();
   }
     CWWIRELESS.loop();

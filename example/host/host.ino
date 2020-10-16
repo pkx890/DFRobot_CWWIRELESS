@@ -15,13 +15,12 @@
 #include "DFRobot_CWWIRELESS.h"
 #define SLAVE 0
 #define HOST 1
+static long long stime=0; 
+static long long rtime=0;
 
 CWWIRELESS_IIC CWWIRELESS(0x24,HOST);
 String str="";
-String cmd1="open_LED";
-String cmd2="close_LED";
-static long long stime=0; 
-static long long rtime=0;
+
 void recvCallback();
 void recvCallback(){ 
   if((millis()-rtime)>500){
@@ -41,14 +40,13 @@ void setup()
 {
   Serial.begin(115200);
   CWWIRELESS.setCallback(recvCallback);
-  CWWIRELESS.transferHoststring("host begin\r\n");
 }
 
 void loop()
 { 
   if((millis()-stime)>5000)
   {
-    CWWIRELESS.transferHoststring("HELLO WORLD nihao aaa bbb 123 !@$#\r\n");
+    CWWIRELESS.transferHoststring("This is a message from the HOST\n");
     stime=millis();
   }
   CWWIRELESS.loop(); 

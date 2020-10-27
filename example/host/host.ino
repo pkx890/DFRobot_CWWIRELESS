@@ -24,9 +24,7 @@ String str="";
 void recvCallback();
 void recvCallback(){ 
   if((millis()-rtime)>PACKET_INTERVAL){
-    if(CWWIRELESS.cumsgBufHead!=NULL){
-      CWWIRELESS.hostBegintransfer();
-    }
+    CWWIRELESS.hostBegintransfer();
     String str=CWWIRELESS.reciveSlavestring();
     if(str!=""){
       Serial.print(str);
@@ -40,15 +38,13 @@ void setup()
 {
   Serial.begin(115200);
   CWWIRELESS.setCallback(recvCallback);
+  CWWIRELESS.transferHoststring("This is a message from the HOST\n");
+  delay(2000);
 }
 
 void loop()
 { 
-  if((millis()-stime)>10000)
-  {
-    CWWIRELESS.transferHoststring("This is a message from the HOST\n");
-    stime=millis();
-  }
+  CWWIRELESS.transferHoststring("This is a message from the HOST\n");
   CWWIRELESS.loop(); 
 
 }

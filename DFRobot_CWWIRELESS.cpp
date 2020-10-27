@@ -52,18 +52,17 @@ bool CWWIRELESS::getSlavePPPPdata(uint8_t* buf,uint8_t size){
     return 1;
 }
 
-void CWWIRELESS::setSlavePPPPdata(uint8_t* buf,uint8_t size){
+uint8_t CWWIRELESS::setSlavePPPPdata(uint8_t* buf,uint8_t size){
   uint8_t data_flow=0;
   uint8_t cmd_status = 0;
   uint8_t i = 0;
   String str="";
   while(1){
-    readReg(CMD_FROM_MCU_ADDR,this->rxbuf,1);//get mcu cmd status
-    if(this->rxbuf[0]==0){
-      break;
-    }
-  } 
+  readReg(CMD_FROM_MCU_ADDR,this->rxbuf,1);//get mcu cmd status
   cmd_status=this->rxbuf[0];
+  if((cmd_status & 0x01) == 0)
+	  break;
+  }
   if((cmd_status & 0x01) == 0){
     readReg(TX_PPPP_DATA_STATE_ADDR,this->rxbuf,1);
     data_flow = this->rxbuf[0];//get tx_pppp data status
@@ -73,25 +72,27 @@ void CWWIRELESS::setSlavePPPPdata(uint8_t* buf,uint8_t size){
     writeReg(TX_PPPP_DATA_STATE_ADDR,this->txbuf,1);//clear tx_pppp_data status b0
     this->txbuf[0] = cmd_status | 0x01;
     writeReg(CMD_FROM_MCU_ADDR,this->txbuf,1);
+	return 0;
   }else{
+	  return 1;
   }
 }
 
 void CWWIRELESS::transferSlavestring(char* str){
+  uint8_t strlength=strlen(str);
+  uint8_t memlength=freeMemory();
+  if(memlength<=strlength)
+    return ;
   uint8_t buf[4];
   uint8_t len=strlen(str);
   uint8_t packcount=len/VALID_DATA;
   uint8_t num=len%VALID_DATA;
-
   for(int i=0;i<packcount;i++){
     for(int j=0;j<VALID_DATA;j++){
       buf[j]=(int)(*str);
       str++;
     }
-    buf[SLAVE_CHEAK_DATA]=proof_test_value++;
-    if(0==cuappEnqueue(buf)){
-		proof_test_value--;
-	}
+    cuappEnqueue(buf);
   }
   for(int i =0;i<4;i++){
     buf[i]=0;
@@ -100,20 +101,43 @@ void CWWIRELESS::transferSlavestring(char* str){
     buf[i]=(int)(*str);
     str++;
   }
-  buf[SLAVE_CHEAK_DATA]=proof_test_value++;
-    if(0==cuappEnqueue(buf)){
-      proof_test_value--;
-    }
+  cuappEnqueue(buf);
+}
+
+
+static bool bufIsempty(uint8_t* buf){
+  for(int i=0;i<5;i++){
+    if(buf[i]!=0)
+      return 1;
+  }
+  return 0;
 }
 
 void CWWIRELESS::slaveBegintransfer(){
-  denominator++;
-  if(Ready_to_send_packets==NULL){
-    molecule++;
-    Ready_to_send_packets = cuappDequeue();
+  if((flag1==0)&&(flag3==1)){
+    ifsend=1;
+    count=1;    
   }
-  setSlavePPPPdata(Ready_to_send_packets->data,4);
-  MARK=Ready_to_send_packets->data[3];
+  if(MARK==1)
+    ifsend=0;
+  if(Ready_to_send_packets==NULL){
+    if(cumsgBufHead==NULL){
+      uint8_t buffer[4]={0};
+      cuappEnqueue(buffer);
+    }
+    Ready_to_send_packets = cuappDequeue();
+    Ready_to_send_packets->data[3]=proof_test_value++;
+  }
+  if((ifsend==1)&&(count<2)){
+    setSlavePPPPdata(previous_packets[count],4);
+    MARK=previous_packets[count][3];
+    ifnow=0;
+  }else{
+    setSlavePPPPdata(Ready_to_send_packets->data,4);
+    MARK=Ready_to_send_packets->data[3];
+    ifnow=1;
+  }
+  flag1=0;
 }
 
 uint8_t CWWIRELESS::chackSlavestate(){
@@ -123,19 +147,58 @@ uint8_t CWWIRELESS::chackSlavestate(){
 }
 
 String CWWIRELESS::receiveHoststring(){
-  uint8_t buf[10];
+  uint8_t buf[4];
   String str;
   if(chackSlavestate()){
+    flag1=1;
     getSlavePPPPdata(buf,4);
-    if(buf[3]==MARK){
-      free(Ready_to_send_packets);
-      Ready_to_send_packets=NULL;
+    for(int i=0;i<3;i++){
+      if((buf[i]!=0)&&(buf[i]!=1))
+        str+=(char)buf[i];
     }
-    for(int i=0;i<3;i++)
-    {
-      str+=(char)buf[i];
+    DBG(buf[3]);
+    DBG(MARK);
+    uint8_t d=MARK-1;
+    uint8_t r=buf[3]-1;
+    uint8_t r1=buf[3]+2;
+    if((buf[3]==MARK)||(buf[3]==d)){
+      if(buf[3]==MARK)
+        flag3=0;
+      else
+        flag3=1;
+      if(ifnow==1){
+        if(Ready_to_send_packets!=NULL){
+          for(int i=0;i<5;i++){
+            previous_packets[0][i]=previous_packets[1][i];
+          }
+          for(int i=0;i<5;i++){
+            previous_packets[1][i]=Ready_to_send_packets->data[i];
+          }
+          free(Ready_to_send_packets);
+          Ready_to_send_packets=NULL;
+        }
+      }else{
+        if(count==1){
+          count=0;
+          ifsend=0;
+        }else{
+          count=1;
+        }
+      }
+    }else if(abs(buf[3]-MARK)>2){
+      proof_test_value=1;
+      Ready_to_send_packets->data[3]=proof_test_value++;
+      for(int i=0;i<5;i++){
+        previous_packets[0][i]=1;
+        previous_packets[1][i]=1;
+        data1=0;
+      }
+    }else if(r1==MARK){
+      ifsend=1;
+    }else{
+      //ifsend=0;
     }
-    if(buf[3]!=data1){
+    if(data1==r){
       data1=buf[3];
     }else{
       str="";
@@ -173,7 +236,11 @@ void CWWIRELESS::sendHostpacket(uint8_t* buf,uint8_t size){
 }
 
 void CWWIRELESS::transferHoststring(char* str){
-  uint8_t buf[6]={0x48,0};
+  uint8_t strlength=strlen(str);
+  uint8_t memlength=freeMemory();
+  if(memlength<=strlength)
+    return ;
+  uint8_t buf[5]={0x48,0};
   uint8_t len=strlen(str);
   uint8_t packcount=len/VALID_DATA;
   uint8_t num=len%VALID_DATA;
@@ -184,10 +251,7 @@ void CWWIRELESS::transferHoststring(char* str){
       buf[j]=(int)(*str);
       str++;
     }
-    buf[HOST_CHEAK_DATA]=proof_test_value++;
-          if(0==cuappEnqueue(buf)){
-		proof_test_value--;
-	}
+    cuappEnqueue(buf);
   }
   
   for(int i =1;i<6;i++){
@@ -198,20 +262,35 @@ void CWWIRELESS::transferHoststring(char* str){
     buf[i]=(int)(*str);
     str++;
   }
-  buf[HOST_CHEAK_DATA]=proof_test_value++;
-  if(0==cuappEnqueue(buf)){
-    proof_test_value--;
-  }
+  cuappEnqueue(buf);
 }
 
 void CWWIRELESS::hostBegintransfer(){
-  denominator++;
-  if(Ready_to_send_packets==NULL){
-    molecule++;
-    Ready_to_send_packets=cuappDequeue();
+  if((flag1==0)&&(flag3==1)){
+    ifsend=1;
+    count=1;    
   }
-  sendHostpacket(Ready_to_send_packets->data,5);
-  MARK=Ready_to_send_packets->data[4];
+  if(MARK==1)
+    ifsend=0;
+  if(Ready_to_send_packets==NULL){
+    if(cumsgBufHead==NULL){
+      uint8_t buffer[5]={0x48,0};
+      cuappEnqueue(buffer);
+    }
+    Ready_to_send_packets=cuappDequeue();
+    Ready_to_send_packets->data[4]=proof_test_value++;
+  }
+  if((ifsend==1)&&(count<2)){
+    previous_packets[count][0]=0x48;
+    sendHostpacket(previous_packets[count],5);
+    MARK=previous_packets[count][4];
+    ifnow=0;
+  }else{
+    sendHostpacket(Ready_to_send_packets->data,5);
+    MARK=Ready_to_send_packets->data[4];
+    ifnow=1;
+  }
+  flag1=0;
 }
 
 void CWWIRELESS::setCallback(void (*call)()){
@@ -270,24 +349,62 @@ String CWWIRELESS::reciveSlavestring(){
   int i=0;
   String newstr;
   if(getHostflag()){
+    flag1=1;
     uint8_t rsize=receiveHostpacket(rbuf);
     if(rsize+1 >= 1 ){
       for(i = 2;i < rsize+1;i++){
-        newstr+=(char)rbuf[i];
+        if((rbuf[i]!=0)&&(rbuf[i]!=1))
+          newstr+=(char)rbuf[i];
       }
-    uint8_t d=MARK-1;
-    if((rbuf[5]==MARK)|| (rbuf[5]==d)){
-      free(Ready_to_send_packets);
-      Ready_to_send_packets=NULL;
     }
-    if(rbuf[5]!=data1)
+    uint8_t d=MARK-1;
+    uint8_t r=rbuf[5]-1;
+    uint8_t r1=rbuf[5]+2;
+    DBG(rbuf[5]);
+    DBG(MARK);
+    if((rbuf[5]==MARK)||(rbuf[5]==d)){
+      if(rbuf[5]==MARK)
+        flag3=0;
+      else
+        flag3=1;
+      if(ifnow==1){
+        if(Ready_to_send_packets!=NULL){
+          for(int i=0;i<5;i++){
+            previous_packets[0][i]=previous_packets[1][i];
+          }
+          for(int i=0;i<5;i++){
+            previous_packets[1][i]=Ready_to_send_packets->data[i];
+          }
+          free(Ready_to_send_packets);
+          Ready_to_send_packets=NULL;
+        }
+      }else{
+        if(count==1){
+          count=0;
+          ifsend=0;
+        }else{
+          count=1;
+        }
+      }
+    }else if(abs(rbuf[5]-MARK)>2){
+      proof_test_value=1;
+      Ready_to_send_packets->data[4]=proof_test_value++;
+      for(int i=3;i<5;i++){
+        previous_packets[0][i]=1;
+        previous_packets[1][i]=1;
+      }
+      data1=0;
+    }else if(MARK==r1){
+      ifsend=1;
+    }else{
+      //ifsend=0;
+    }
+    if(data1==r){
       data1=rbuf[5];
-    else{
+    }else{
       newstr="";
     }
-      return newstr;
-    }
-  }else{
+    return newstr;
   }
 }
 
@@ -347,10 +464,12 @@ void CWWIRELESS_IIC::readReg(uint8_t reg,uint8_t* buf,uint8_t len){
   if(this->type)
     Wire.write(0);
   uint8_t data=Wire.endTransmission();  
-  Wire.requestFrom(IIC_addr,len);
+  if(0==Wire.requestFrom(IIC_addr,len))
+    return ;
   for(int i=0;i<len;i++){
     buf[i]=Wire.read();
   }
+  
 }
 
 void CWWIRELESS_IIC::writeReg(uint8_t reg,uint8_t* buf,uint8_t len){

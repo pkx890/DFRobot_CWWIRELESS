@@ -1,6 +1,6 @@
 #include "Wire.h"
 #include "Arduino.h"
-
+#include <MemoryFree.h>
 //Aregister belonging to TX
 #define FW_VER_ADDR              0x00
 #define TX_STATUS_ADDR           0x02
@@ -59,8 +59,15 @@
 #define SLAVE_CHEAK_DATA         3
 #define HOST_CHEAK_DATA          4
 
+#define PACKET_INTERVAL          1000
 
+//#define ENABLEDBG
+
+#ifdef ENABLEDBG
 #define DBG(sth)   Serial.print("DBG:");Serial.print(__LINE__);Serial.print("        ");Serial.println(sth)
+#else
+#define DBG(sth)
+#endif
 
 typedef struct
 {
@@ -83,12 +90,18 @@ struct sQueueData{
 class CWWIRELESS
 {
   public:
+    bool flag1=1;//处理丢包
+    bool flag2=0;//
+    bool flag3=0;//处理收发包序号相同丢包问题
+    bool flag4=0;
+    uint8_t count = 0;
+    uint8_t ifnow=1;
+    uint8_t ifsend=0;
     uint8_t proof_test_value=1;
-    uint8_t MARK=0;
-    uint8_t data1=255;
-    int molecule=0;
-    int denominator=0;
+    uint8_t MARK=1;
+    uint8_t data1=0;
     struct sQueueData * Ready_to_send_packets;
+    uint8_t previous_packets[2][5]={{0,0,0,1,1},{0,0,0,1,1}};
     //TX
     uint8_t type;
     CWWIRELESS(){};
@@ -99,7 +112,7 @@ class CWWIRELESS
     uint8_t slaveStatus();
     String receiveHoststring();
     bool getSlavePPPPdata(uint8_t* buf,uint8_t size);
-    void setSlavePPPPdata(uint8_t* buf,uint8_t size);
+    uint8_t setSlavePPPPdata(uint8_t* buf,uint8_t size);
     uint8_t chackSlavestate();
     void slaveBegintransfer();
     String respondHost();

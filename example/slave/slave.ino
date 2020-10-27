@@ -28,9 +28,7 @@ void recvCallback(){
     if(str!=""){
       Serial.print(str.c_str());
     }
-    if(CWWIRELESS.cumsgBufHead!=NULL){
-      CWWIRELESS.slaveBegintransfer();
-    }
+    CWWIRELESS.slaveBegintransfer();
     rtime = millis();
   }else{
   }  
@@ -40,14 +38,12 @@ void setup()
 {
   Serial.begin(115200);
   CWWIRELESS.setCallback(recvCallback);
+  CWWIRELESS.transferSlavestring("This is a message from the SLAVE\n");
+  delay(2000);
 }
 
 void loop()
 {
-  if((millis()-stime)>10000)
-  {
-    CWWIRELESS.transferSlavestring("This is a message from the SLAVE\n");
-    stime=millis();
-  }
-    CWWIRELESS.loop();
+  CWWIRELESS.transferSlavestring("This is a message from the SLAVE\n");
+  CWWIRELESS.loop();
 }

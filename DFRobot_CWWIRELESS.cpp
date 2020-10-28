@@ -57,12 +57,12 @@ uint8_t CWWIRELESS::setSlavePPPPdata(uint8_t* buf,uint8_t size){
   uint8_t cmd_status = 0;
   uint8_t i = 0;
   String str="";
-  while(1){
+  //while(1){
   readReg(CMD_FROM_MCU_ADDR,this->rxbuf,1);//get mcu cmd status
   cmd_status=this->rxbuf[0];
-  if((cmd_status & 0x01) == 0)
+/*   if((cmd_status & 0x01) == 0)
 	  break;
-  }
+  } */
   if((cmd_status & 0x01) == 0){
     readReg(TX_PPPP_DATA_STATE_ADDR,this->rxbuf,1);
     data_flow = this->rxbuf[0];//get tx_pppp data status
@@ -114,9 +114,11 @@ static bool bufIsempty(uint8_t* buf){
 }
 
 void CWWIRELESS::slaveBegintransfer(){
+  if(flag4==0)
+	  return ;
   if((flag1==0)&&(flag3==1)){
     ifsend=1;
-    count=1;    
+    count=1;
   }
   if(MARK==1)
     ifsend=0;
@@ -151,6 +153,7 @@ String CWWIRELESS::receiveHoststring(){
   String str;
   if(chackSlavestate()){
     flag1=1;
+    flag4=1;
     getSlavePPPPdata(buf,4);
     for(int i=0;i<3;i++){
       if((buf[i]!=0)&&(buf[i]!=1))
@@ -162,7 +165,7 @@ String CWWIRELESS::receiveHoststring(){
     uint8_t r=buf[3]-1;
     uint8_t r1=buf[3]+2;
     if((buf[3]==MARK)||(buf[3]==d)){
-      if(buf[3]==MARK)
+      if((buf[3]==MARK)&&(MARK!=1))
         flag3=0;
       else
         flag3=1;
@@ -185,7 +188,7 @@ String CWWIRELESS::receiveHoststring(){
           count=1;
         }
       }
-    }else if(abs(buf[3]-MARK)>2){
+    }else if(abs(buf[3]-MARK)>5){
       proof_test_value=1;
       Ready_to_send_packets->data[3]=proof_test_value++;
       for(int i=0;i<5;i++){
@@ -386,7 +389,7 @@ String CWWIRELESS::reciveSlavestring(){
           count=1;
         }
       }
-    }else if(abs(rbuf[5]-MARK)>2){
+    }else if(abs(rbuf[5]-MARK)>5){
       proof_test_value=1;
       Ready_to_send_packets->data[4]=proof_test_value++;
       for(int i=3;i<5;i++){
